@@ -1,8 +1,14 @@
 package com.aggregation.aggregation;
 
 import com.aggregation.aggregation.api.AggregationResource;
+import com.aggregation.pricing.PricingInfo;
+import com.aggregation.pricing.PricingInfoBuilder;
 import com.aggregation.pricing.PricingService;
+import com.aggregation.shipments.ShipmentInfo;
+import com.aggregation.shipments.ShipmentInfoBuilder;
 import com.aggregation.shipments.ShipmentsService;
+import com.aggregation.track.TrackInfo;
+import com.aggregation.track.TrackInfoBuilder;
 import com.aggregation.track.TrackService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,9 +17,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -36,40 +41,64 @@ public class AggregationUseCaseServiceTest {
 
     @Test
     void aggregate_allListsAreNonNull() {
-        String pricing1 = "CN";
-        String pricing2 = "NL";
-        List<String> countryCodes = Arrays.asList(pricing1, pricing2);
+        String countryCode1 = "CN";
+        String countryCode2 = "NL";
+        List<String> countryCodes = Arrays.asList(countryCode1, countryCode2);
 
-        HashMap<String, String> obtainedPricing = new HashMap<>();
-        obtainedPricing.put(pricing1, "22.956661391130684");
-        obtainedPricing.put(pricing2, "73.98055140423651");
+        PricingInfo pricingInfo1 = PricingInfoBuilder.builder()
+                .countryCode(countryCode1)
+                .price("22.956661391130684")
+                .build();
+        PricingInfo pricingInfo2 = PricingInfoBuilder.builder()
+                .countryCode(countryCode2)
+                .price("73.98055140423651")
+                .build();
 
-        when(pricingService.getPricingInfo(countryCodes)).thenReturn(obtainedPricing);
+        when(pricingService.getPricingInfo(countryCode1)).thenReturn(CompletableFuture.completedFuture(pricingInfo1));
+        when(pricingService.getPricingInfo(countryCode2)).thenReturn(CompletableFuture.completedFuture(pricingInfo2));
 
-        String track1 = "109347263";
-        String track2 = "1234567891";
-        List<String> trackNumbers = Arrays.asList(track1, track2);
+        String trackingId1 = "109347263";
+        String trackingId2 = "1234567891";
+        List<String> trackNumbers = Arrays.asList(trackingId1, trackingId2);
 
-        HashMap<String, String> obtainedTrack = new HashMap<>();
-        obtainedTrack.put(track1, "DELIVERING");
-        obtainedTrack.put(track2, "IN TRANSIT");
+        TrackInfo trackInfo1 = TrackInfoBuilder.builder()
+                .trackingId(trackingId1)
+                .status("DELIVERING")
+                .build();
+        TrackInfo trackInfo2 = TrackInfoBuilder.builder()
+                .trackingId(trackingId2)
+                .status("IN TRANSIT")
+                .build();
 
-        when(trackService.getTrackingInfo(trackNumbers)).thenReturn(obtainedTrack);
+        when(trackService.getTrackInfo(trackingId1)).thenReturn(CompletableFuture.completedFuture(trackInfo1));
+        when(trackService.getTrackInfo(trackingId2)).thenReturn(CompletableFuture.completedFuture(trackInfo2));
 
         String shipments1 = "2136544";
         String shipments2 = "8975543";
         List<String> shipments = Arrays.asList(shipments1, shipments2);
 
-        Map<String, List<String>> obtainedShipments = new HashMap<>();
-        obtainedShipments.put(shipments1, Arrays.asList("box", "box"));
-        obtainedShipments.put(shipments2, Arrays.asList("envelope", "box"));
-        when(shipmentsService.getShipmentInfo(shipments)).thenReturn(obtainedShipments);
+        ShipmentInfo shipmentInfo1 = ShipmentInfoBuilder.builder()
+                .key(shipments1)
+                .value(Arrays.asList("box", "box"))
+                .build();
+        ShipmentInfo shipmentInfo2 = ShipmentInfoBuilder.builder()
+                .key(shipments2)
+                .value(Arrays.asList("envelope", "box"))
+                .build();
+        when(shipmentsService.getShipmentInfo(shipments1)).thenReturn(CompletableFuture.completedFuture(shipmentInfo1));
+        when(shipmentsService.getShipmentInfo(shipments2)).thenReturn(CompletableFuture.completedFuture(shipmentInfo2));
 
         AggregationResource aggregationResource = aggregationUseCaseService.aggregate(countryCodes, trackNumbers, shipments);
 
-        assertThat(aggregationResource.getPricing(), is(obtainedPricing));
-        assertThat(aggregationResource.getShipments(), is(obtainedShipments));
-        assertThat(aggregationResource.getTrack(), is(obtainedTrack));
+        assertThat(aggregationResource.getPricing().size(), is(2));
+        assertThat(aggregationResource.getPricing().get(countryCode1), is(pricingInfo1.getPrice()));
+        assertThat(aggregationResource.getPricing().get(countryCode2), is(pricingInfo2.getPrice()));
+        assertThat(aggregationResource.getShipments().size(), is(2));
+        assertThat(aggregationResource.getShipments().get(shipments1), is(shipmentInfo1.getValue()));
+        assertThat(aggregationResource.getShipments().get(shipments2), is(shipmentInfo2.getValue()));
+        assertThat(aggregationResource.getTrack().size(), is(2));
+        assertThat(aggregationResource.getTrack().get(trackingId1), is(trackInfo1.getStatus()));
+        assertThat(aggregationResource.getTrack().get(trackingId2), is(trackInfo2.getStatus()));
     }
 
     @Test

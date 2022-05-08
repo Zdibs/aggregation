@@ -1,49 +1,101 @@
 package com.aggregation.track;
 
-import com.aggregation.configuration.ApiProperties;
-import com.aggregation.okhttp.OkHttpCallManager;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.aggregation.configuration.QueueTimeoutProperties;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Scope;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 @Service
+@Scope("singleton")
 @RequiredArgsConstructor
 public class TrackService {
 
-    private final ObjectMapper objectMapper;
-    private final ApiProperties apiProperties;
-    private final OkHttpCallManager okHttpCallManager;
+    private final GetTrackService getTrackService;
+    private final QueueTimeoutProperties queueTimeoutProperties;
 
-    public Map<String, String> getTrackingInfo(List<String> trackNumbers) {
-        if (!trackNumbers.isEmpty()) {
-            String responseBody = okHttpCallManager.call("http://" + apiProperties.getHostname() + ":" + apiProperties.getPort() +
-                    "/" + apiProperties.getTrackEndpoint() + "?q=" + String.join(",", trackNumbers));
+    private final List<String> queue = Collections.synchronizedList(new ArrayList<>());
+    private final Map<String, String> results = Collections.synchronizedMap(new HashMap<>());
 
-            try {
-                return parseResult(responseBody);
-            } catch (IOException e) {
-                e.printStackTrace();
+    @Async
+    public CompletableFuture<TrackInfo> getTrackInfo(String trackingId) {
+        try {
+            List<String> requestedTrackingDueToTimeout = new ArrayList<>();
+
+            List<String> requestedTracking = addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(trackingId);
+
+            if (!requestedTracking.isEmpty()) {
+                getTrackingInfo(requestedTracking);
+            } else {
+                requestedTrackingDueToTimeout.addAll(waitForEnoughEntriesAndRequestDataAfterTimeout(trackingId));
+            }
+
+            if (!requestedTrackingDueToTimeout.isEmpty()) {
+                getTrackingInfo(requestedTrackingDueToTimeout);
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // Here a concurrency issue remains for the case where the same results have been requested multiple times
+        if (!queue.contains(trackingId)) {
+            return CompletableFuture.completedFuture(new TrackInfo(trackingId, results.remove(trackingId)));
+        } else {
+            return CompletableFuture.completedFuture(new TrackInfo(trackingId, results.get(trackingId)));
+        }
+    }
+
+    private List<String> waitForEnoughEntriesAndRequestDataAfterTimeout(String trackingId) throws InterruptedException {
+        List<String> requestedTrackingIdsDueToTimeout = new ArrayList<>();
+
+        synchronized (queue) {
+            queue.wait(queueTimeoutProperties.getTimeoutInMilliseconds());
+
+            if(!results.containsKey(trackingId)) {
+                int queueSize = queue.size();
+                for (int i = 0; i < 5 && i < queueSize; i++) {
+                    requestedTrackingIdsDueToTimeout.add(queue.remove(0));
+                }
             }
         }
 
-        return null;
+        return requestedTrackingIdsDueToTimeout;
     }
 
-    private Map<String, String> parseResult(String responseBody) throws IOException {
-        Map<String, String> answer;
-        answer = responseBody != null ? objectMapper.readValue(responseBody, new TypeReference<HashMap<String, String>>() {}) : Collections.emptyMap();
+    private List<String> addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(String trackingId) {
+        List<String> requestedTrackingIds = new ArrayList<>();
 
-        if (answer != null && answer.containsKey("message")) {
-            answer = null;
+        synchronized (queue) {
+            queue.add(trackingId);
+
+            if (queue.size() == 5) {
+                for (int i = 0; i < 5; i++) {
+                    requestedTrackingIds.add(queue.remove(0));
+                }
+            }
         }
 
-        return answer;
+        return requestedTrackingIds;
+    }
+
+    private void getTrackingInfo(List<String> trackRequests) {
+        Map<String, String> answer = getTrackService.getTrackingInfo(trackRequests);
+
+        if (answer != null) {
+            results.putAll(answer);
+        }
+
+        synchronized (queue) {
+            queue.notifyAll();
+        }
     }
 }

@@ -1,4 +1,4 @@
-package com.aggregation.pricing;
+package com.aggregation.shipments;
 
 import com.aggregation.configuration.QueueTimeoutProperties;
 import org.junit.jupiter.api.Test;
@@ -20,70 +20,70 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-public class PricingServiceTest {
+public class ShipmentServiceTest {
 
     @Mock
-    private GetPricingService getPricingService;
+    private GetShipmentsService getShipmentsService;
     @Mock
     private QueueTimeoutProperties queueTimeoutProperties;
 
     @Captor
-    private ArgumentCaptor<List<String>> pricingCaptor;
+    private ArgumentCaptor<List<String>> shipmentsCaptor;
 
     @InjectMocks
-    private PricingService pricingService;
+    private ShipmentsService shipmentsService;
 
     @Test
-    void getPricingInfo_calledExactlyFiveTimes() throws InterruptedException {
+    void getShipmentInfo_calledExactlyFiveTimes() throws InterruptedException {
         ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
         threadPoolTaskExecutor.setCorePoolSize(5);
         threadPoolTaskExecutor.initialize();
 
         when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(100);
 
-        List<String> countryCodes = new ArrayList<>();
-        countryCodes.add("CN");
-        countryCodes.add("NL");
-        countryCodes.add("BE");
-        countryCodes.add("DE");
-        countryCodes.add("FR");
+        List<String> shipmentIds = new ArrayList<>();
+        shipmentIds.add("1234567891");
+        shipmentIds.add("109347263");
+        shipmentIds.add("23425");
+        shipmentIds.add("6364");
+        shipmentIds.add("233422424");
 
         CountDownLatch countDownLatch = new CountDownLatch(5);
 
         for (int i = 0; i < 5; i++) {
             int finalI = i;
             threadPoolTaskExecutor.execute(() -> {
-                pricingService.getPricingInfo(countryCodes.get(finalI));
+                shipmentsService.getShipmentInfo(shipmentIds.get(finalI));
                 countDownLatch.countDown();
             });
         }
 
         countDownLatch.await();
 
-        verify(getPricingService).getPricingInfo(pricingCaptor.capture());
-        List<String> capturedPricingList = pricingCaptor.getValue();
+        verify(getShipmentsService).getShipments(shipmentsCaptor.capture());
+        List<String> capturedShipmentList = shipmentsCaptor.getValue();
 
-        assertThat(capturedPricingList.size(), is(5));
+        assertThat(capturedShipmentList.size(), is(5));
     }
 
     @Test
-    void getPricingInfo_calledTwiceWaitsOnTimeout() throws InterruptedException {
+    void getShipmentInfo_calledTwiceWaitsOnTimeout() throws InterruptedException {
         ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
         threadPoolTaskExecutor.setCorePoolSize(5);
         threadPoolTaskExecutor.initialize();
 
         when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(100);
 
-        List<String> countryCodes = new ArrayList<>();
-        countryCodes.add("CN");
-        countryCodes.add("NL");
+        List<String> shipmentIds = new ArrayList<>();
+        shipmentIds.add("1234567891");
+        shipmentIds.add("109347263");
 
         CountDownLatch countDownLatch = new CountDownLatch(2);
 
         for (int i = 0; i < 2; i++) {
             int finalI = i;
             threadPoolTaskExecutor.execute(() -> {
-                pricingService.getPricingInfo(countryCodes.get(finalI));
+                shipmentsService.getShipmentInfo(shipmentIds.get(finalI));
                 countDownLatch.countDown();
             });
             Thread.sleep(20);
@@ -91,9 +91,9 @@ public class PricingServiceTest {
 
         countDownLatch.await();
 
-        verify(getPricingService).getPricingInfo(pricingCaptor.capture());
-        List<String> capturedPricingList = pricingCaptor.getValue();
+        verify(getShipmentsService).getShipments(shipmentsCaptor.capture());
+        List<String> capturedShipmentList = shipmentsCaptor.getValue();
 
-        assertThat(capturedPricingList.size(), is(2));
+        assertThat(capturedShipmentList.size(), is(2));
     }
 }

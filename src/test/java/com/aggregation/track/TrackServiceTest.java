@@ -1,10 +1,6 @@
 package com.aggregation.track;
 
-import com.aggregation.configuration.ApiProperties;
-import com.aggregation.okhttp.OkHttpCallManager;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.aggregation.configuration.QueueTimeoutProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -12,106 +8,92 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class TrackServiceTest {
 
     @Mock
-    private ObjectMapper objectMapper;
+    private GetTrackService getTrackService;
     @Mock
-    private ApiProperties apiProperties;
-    @Mock
-    private OkHttpCallManager okHttpCallManager;
+    private QueueTimeoutProperties queueTimeoutProperties;
 
     @Captor
-    private ArgumentCaptor<String> requestUrlCaptor;
+    private ArgumentCaptor<List<String>> trackCaptor;
 
     @InjectMocks
     private TrackService trackService;
 
     @Test
-    void getPricingInfo_success() throws IOException {
-        // given
-        String track1 = "109347263";
-        String track2 = "1234567891";
+    void getTrackingInfo_calledExactlyFiveTimes() throws InterruptedException {
+        ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
+        threadPoolTaskExecutor.setCorePoolSize(5);
+        threadPoolTaskExecutor.initialize();
 
-        String objectMapperString = "testObjectMapperString";
-        when(okHttpCallManager.call(requestUrlCaptor.capture())).thenReturn(objectMapperString);
+        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(100);
 
-        String hostname = "testHostname";
-        when(apiProperties.getHostname()).thenReturn(hostname);
-        String port = "testPort";
-        when(apiProperties.getPort()).thenReturn(port);
-        String trackEndpoint = "testTrack";
-        when(apiProperties.getTrackEndpoint()).thenReturn(trackEndpoint);
+        List<String> trackingIds = new ArrayList<>();
+        trackingIds.add("1234567891");
+        trackingIds.add("109347263");
+        trackingIds.add("23425");
+        trackingIds.add("6364");
+        trackingIds.add("233422424");
 
-        HashMap<String, String> objectMapperAnswer = new HashMap<>();
-        objectMapperAnswer.put(track1, "DELIVERING");
-        objectMapperAnswer.put(track2, "IN TRANSIT");
-        when(objectMapper.readValue(eq(objectMapperString), any(TypeReference.class))).thenReturn(objectMapperAnswer);
+        CountDownLatch countDownLatch = new CountDownLatch(5);
 
-        // when
-        List<String> track = Arrays.asList(track1, track2);
-        Map<String, String> result = trackService.getTrackingInfo(track);
+        for (int i = 0; i < 5; i++) {
+            int finalI = i;
+            threadPoolTaskExecutor.execute(() -> {
+                trackService.getTrackInfo(trackingIds.get(finalI));
+                countDownLatch.countDown();
+            });
+        }
 
-        // then
-        String requestUrl = requestUrlCaptor.getValue();
-        assertThat(requestUrl, is("http://" + hostname + ":" + port +
-                "/" + trackEndpoint + "?q=" + String.join(",", track)));
-        assertThat(result, is(objectMapperAnswer));
+        countDownLatch.await();
+
+        verify(getTrackService).getTrackingInfo(trackCaptor.capture());
+        List<String> capturedTrackList = trackCaptor.getValue();
+
+        assertThat(capturedTrackList.size(), is(5));
     }
 
     @Test
-    void getPricingInfo_shouldHandleEmptyShipmentsList() {
-        Map<String, String> result = trackService.getTrackingInfo(Collections.emptyList());
+    void getTrackingInfo_calledTwiceWaitsOnTimeout() throws InterruptedException {
+        ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
+        threadPoolTaskExecutor.setCorePoolSize(5);
+        threadPoolTaskExecutor.initialize();
 
-        assertThat(result, is(nullValue()));
-        verifyNoInteractions(okHttpCallManager);
-    }
+        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(100);
 
-    @Test
-    void getPricingInfo_shouldHandleResultThatContainsMessageKeyword() throws JsonProcessingException {
-        // given
-        String track1 = "109347263";
-        String track2 = "1234567891";
+        List<String> trackingIds = new ArrayList<>();
+        trackingIds.add("1234567891");
+        trackingIds.add("109347263");
 
-        String objectMapperString = "testObjectMapperString";
-        when(okHttpCallManager.call(requestUrlCaptor.capture())).thenReturn(objectMapperString);
+        CountDownLatch countDownLatch = new CountDownLatch(2);
 
-        String hostname = "testHostname";
-        when(apiProperties.getHostname()).thenReturn(hostname);
-        String port = "testPort";
-        when(apiProperties.getPort()).thenReturn(port);
-        String trackEndpoint = "testTrack";
-        when(apiProperties.getTrackEndpoint()).thenReturn(trackEndpoint);
+        for (int i = 0; i < 2; i++) {
+            int finalI = i;
+            threadPoolTaskExecutor.execute(() -> {
+                trackService.getTrackInfo(trackingIds.get(finalI));
+                countDownLatch.countDown();
+            });
+            Thread.sleep(20);
+        }
 
-        HashMap<String, String> objectMapperAnswer = new HashMap<>();
-        objectMapperAnswer.put("message", "Service not available");
-        when(objectMapper.readValue(eq(objectMapperString), any(TypeReference.class))).thenReturn(objectMapperAnswer);
+        countDownLatch.await();
 
-        // when
-        List<String> track = Arrays.asList(track1, track2);
-        Map<String, String> result = trackService.getTrackingInfo(track);
+        verify(getTrackService).getTrackingInfo(trackCaptor.capture());
+        List<String> capturedTrackList = trackCaptor.getValue();
 
-        // then
-        String requestUrl = requestUrlCaptor.getValue();
-        assertThat(requestUrl, is("http://" + hostname + ":" + port +
-                "/" + trackEndpoint + "?q=" + String.join(",", track)));
-        assertThat(result, is(nullValue()));
+        assertThat(capturedTrackList.size(), is(2));
     }
 }
