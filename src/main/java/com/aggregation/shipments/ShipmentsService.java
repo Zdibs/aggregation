@@ -1,13 +1,10 @@
 package com.aggregation.shipments;
 
 import com.aggregation.configuration.ApiProperties;
+import com.aggregation.okhttp.OkHttpCallManager;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import okhttp3.Call;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.ResponseBody;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -22,30 +19,31 @@ public class ShipmentsService {
 
     private final ObjectMapper objectMapper;
     private final ApiProperties apiProperties;
+    private final OkHttpCallManager okHttpCallManager;
 
     public Map<String, List<String>> getShipmentInfo(List<String> shipments) {
-        OkHttpClient client = new OkHttpClient();
+        if (!shipments.isEmpty()) {
+            String responseBody = okHttpCallManager.call("http://" + apiProperties.getHostname() + ":" + apiProperties.getPort() +
+                    "/" + apiProperties.getShipmentsEndpoint() + "?q=" + String.join(",", shipments));
 
-        Request request = new Request.Builder()
-                .url("http://" + apiProperties.getHostname() + ":" + apiProperties.getPort() +
-                        "/" + apiProperties.getShipmentsEndpoint() + "?q=" + String.join(",", shipments))
-                .build();
-
-        Call call = client.newCall(request);
-        try {
-            ResponseBody responseBody = call.execute().body();
-            Map<String, List<String>> answer;
-            answer = responseBody != null ? objectMapper.readValue(responseBody.string(), new TypeReference<HashMap<String, List<String>>>(){}) : Collections.emptyMap();
-
-            if (answer != null && answer.containsKey("message")) {
-                answer = null;
+            try {
+                return parseResult(responseBody);
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-
-            return answer;
-        } catch (IOException e) {
-            e.printStackTrace();
         }
 
-        return Collections.emptyMap();
+        return null;
+    }
+
+    private Map<String, List<String>> parseResult(String responseBody) throws IOException {
+        Map<String, List<String>> answer;
+        answer = responseBody != null ? objectMapper.readValue(responseBody, new TypeReference<HashMap<String, List<String>>>() {}) : Collections.emptyMap();
+
+        if (answer != null && answer.containsKey("message")) {
+            answer = null;
+        }
+
+        return answer;
     }
 }
