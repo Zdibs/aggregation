@@ -1,10 +1,6 @@
 package com.aggregation.pricing;
 
-import com.aggregation.configuration.ApiProperties;
-import com.aggregation.okhttp.OkHttpCallManager;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.aggregation.configuration.QueueTimeoutProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -12,107 +8,92 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CountDownLatch;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class PricingServiceTest {
 
     @Mock
-    private ObjectMapper objectMapper;
+    private GetPricingService getPricingService;
     @Mock
-    private ApiProperties apiProperties;
-    @Mock
-    private OkHttpCallManager okHttpCallManager;
+    private QueueTimeoutProperties queueTimeoutProperties;
 
     @Captor
-    private ArgumentCaptor<String> requestUrlCaptor;
+    private ArgumentCaptor<List<String>> pricingCaptor;
 
     @InjectMocks
     private PricingService pricingService;
 
     @Test
-    void getPricingInfo_success() throws IOException, ExecutionException, InterruptedException {
-        // given
-        String pricing1 = "CN";
-        String pricing2 = "NL";
+    void getShipmentInfo_calledExactlyFiveTimes() throws InterruptedException {
+        ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
+        threadPoolTaskExecutor.setCorePoolSize(5);
+        threadPoolTaskExecutor.initialize();
 
-        String objectMapperString = "testObjectMapperString";
-        when(okHttpCallManager.call(requestUrlCaptor.capture())).thenReturn(objectMapperString);
+        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(1);
 
-        String hostname = "testHostname";
-        when(apiProperties.getHostname()).thenReturn(hostname);
-        String port = "testPort";
-        when(apiProperties.getPort()).thenReturn(port);
-        String pricingEndpoint = "testPricing";
-        when(apiProperties.getPricingEndpoint()).thenReturn(pricingEndpoint);
+        List<String> countryCodes = new ArrayList<>();
+        countryCodes.add("CN");
+        countryCodes.add("NL");
+        countryCodes.add("BE");
+        countryCodes.add("DE");
+        countryCodes.add("FR");
 
-        HashMap<String, String> objectMapperAnswer = new HashMap<>();
-        objectMapperAnswer.put(pricing1, "22.956661391130684");
-        objectMapperAnswer.put(pricing2, "73.98055140423651");
-        when(objectMapper.readValue(eq(objectMapperString), any(TypeReference.class))).thenReturn(objectMapperAnswer);
+        CountDownLatch countDownLatch = new CountDownLatch(5);
 
-        // when
-        List<String> pricing = Arrays.asList(pricing1, pricing2);
-        Map<String, String> result = pricingService.getPricingInfo(pricing).get();
+        for (int i = 0; i < 5; i++) {
+            int finalI = i;
+            threadPoolTaskExecutor.execute(() -> {
+                pricingService.getPricingInfo(countryCodes.get(finalI));
+                countDownLatch.countDown();
+            });
+        }
 
-        // then
-        String requestUrl = requestUrlCaptor.getValue();
-        assertThat(requestUrl, is("http://" + hostname + ":" + port +
-                "/" + pricingEndpoint + "?q=" + String.join(",", pricing)));
-        assertThat(result, is(objectMapperAnswer));
+        countDownLatch.await();
+
+        verify(getPricingService).getPricingInfo(pricingCaptor.capture());
+        List<String> capturedPricingList = pricingCaptor.getValue();
+
+        assertThat(capturedPricingList.size(), is(5));
     }
 
     @Test
-    void getPricingInfo_shouldHandleEmptyShipmentsList() throws ExecutionException, InterruptedException {
-        Map<String, String> result = pricingService.getPricingInfo(Collections.emptyList()).get();
+    void getShipmentInfo_calledTwiceWaitsOnTimeout() throws InterruptedException {
+        ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
+        threadPoolTaskExecutor.setCorePoolSize(5);
+        threadPoolTaskExecutor.initialize();
 
-        assertThat(result, is(nullValue()));
-        verifyNoInteractions(okHttpCallManager);
-    }
+        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(20);
 
-    @Test
-    void getPricingInfo_shouldHandleResultThatContainsMessageKeyword() throws JsonProcessingException, ExecutionException, InterruptedException {
-        // given
-        String pricing1 = "CN";
-        String pricing2 = "NL";
+        List<String> countryCodes = new ArrayList<>();
+        countryCodes.add("CN");
+        countryCodes.add("NL");
 
-        String objectMapperString = "testObjectMapperString";
-        when(okHttpCallManager.call(requestUrlCaptor.capture())).thenReturn(objectMapperString);
+        CountDownLatch countDownLatch = new CountDownLatch(2);
 
-        String hostname = "testHostname";
-        when(apiProperties.getHostname()).thenReturn(hostname);
-        String port = "testPort";
-        when(apiProperties.getPort()).thenReturn(port);
-        String pricingEndpoint = "testPricing";
-        when(apiProperties.getPricingEndpoint()).thenReturn(pricingEndpoint);
+        for (int i = 0; i < 2; i++) {
+            int finalI = i;
+            threadPoolTaskExecutor.execute(() -> {
+                pricingService.getPricingInfo(countryCodes.get(finalI));
+                countDownLatch.countDown();
+            });
+            Thread.sleep(10);
+        }
 
-        HashMap<String, String> objectMapperAnswer = new HashMap<>();
-        objectMapperAnswer.put("message", "Service not available");
-        when(objectMapper.readValue(eq(objectMapperString), any(TypeReference.class))).thenReturn(objectMapperAnswer);
+        countDownLatch.await();
 
-        // when
-        List<String> pricing = Arrays.asList(pricing1, pricing2);
-        Map<String, String> result = pricingService.getPricingInfo(pricing).get();
+        verify(getPricingService).getPricingInfo(pricingCaptor.capture());
+        List<String> capturedPricingList = pricingCaptor.getValue();
 
-        // then
-        String requestUrl = requestUrlCaptor.getValue();
-        assertThat(requestUrl, is("http://" + hostname + ":" + port +
-                "/" + pricingEndpoint + "?q=" + String.join(",", pricing)));
-        assertThat(result, is(nullValue()));
+        assertThat(capturedPricingList.size(), is(2));
     }
 }

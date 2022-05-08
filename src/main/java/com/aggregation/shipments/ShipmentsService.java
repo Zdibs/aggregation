@@ -83,7 +83,9 @@ public class ShipmentsService {
     private void getShipments(List<String> requestedShipments) {
         Map<String, List<String>> answer = getShipmentsService.getShipments(requestedShipments);
 
-        results.putAll(answer);
+        if (answer != null) {
+            results.putAll(answer);
+        }
 
         synchronized (queue) {
             queue.notifyAll();

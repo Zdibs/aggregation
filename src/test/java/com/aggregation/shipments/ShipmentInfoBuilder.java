@@ -8,6 +8,7 @@ public class ShipmentInfoBuilder {
     private List<String> value;
 
     private ShipmentInfoBuilder() {
+        // Not implemented on purpose
     }
 
     public static ShipmentInfoBuilder builder() {

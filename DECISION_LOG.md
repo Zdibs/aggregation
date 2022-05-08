@@ -30,3 +30,5 @@ Implementation of AS-3
 - Obviously I did not handle exceptions in a nice way anywhere, skipped to save time. 
 - Switched to a much simpler solution using a list as a queue and using wait and notifyAll in order to communicate between threads. This way i was able to implement the requirement that any items remaining in the queue are budled into one request tot he underlying APIs.
 - Made queue timeout configurable for testing purposes
+- If I would have had more time i would have looked into a baseclass for the PricingService, TrackService and ShipmentService as they all work almost in the same way.
+- As a side effect of how the retry works after the timeout we now also auto-recover (once) when the targetted service returns an error message
