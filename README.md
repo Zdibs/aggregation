@@ -1,6 +1,6 @@
 Important note:
 
-Please note that the application by default runs on port 8081. This can be changed in the application.properties file.
+Please note that the application runs on port 8081 by default. This can be changed in the application.properties file.
 
 How to build:
 gradle build
