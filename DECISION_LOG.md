@@ -27,8 +27,6 @@ Implementation of AS-2
   CyclicBarrier has the nice feature that you can make the last thread to join execute some work before waking up the other threads and it is also reusable. It also has a timeout feature.
 
 Implementation of AS-3
-- Timeout was implemented by having any thread that is waiting longer than 5 seconds execute their request on their own. So the requirement that the remaining requests are bundled is currently not implemented.
 - Obviously I did not handle exceptions in a nice way anywhere, skipped to save time. 
-- I am aware that the solution is flawed in multiple ways, however i hope that you can see my coding style within the time spent.
-- If one thread is faster than another the order in which the threads add their request to the request list and then call the cyclicbarrier might not be guaranteed. Due to this problem, a thread that participates in a barrier might not be among the "top 5" requests that are currently in the requests list.
-- I have added state to services that should be stateless. Fixed this by making the service a singleton. Still this is not very nice. 
+- Switched to a much simpler solution using a list as a queue and using wait and notifyAll in order to communicate between threads. This way i was able to implement the requirement that any items remaining in the queue are budled into one request tot he underlying APIs.
+- Made queue timeout configurable for testing purposes

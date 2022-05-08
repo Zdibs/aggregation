@@ -1,5 +1,6 @@
 package com.aggregation.shipments;
 
+import com.aggregation.configuration.QueueTimeoutProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Scope;
@@ -20,37 +21,33 @@ import java.util.concurrent.CompletableFuture;
 public class ShipmentsService {
 
     private final GetShipmentsService getShipmentsService;
+    private final QueueTimeoutProperties queueTimeoutProperties;
 
     private final List<String> queue = Collections.synchronizedList(new ArrayList<>());
     private final Map<String, List<String>> results = Collections.synchronizedMap(new HashMap<>());
 
     @Async
     public CompletableFuture<ShipmentInfo> getShipmentInfo(String shipment) {
-
         try {
-            int queueSize;
+            List<String> requestedShipments = new ArrayList<>();
+            List<String> requestedShipmentsDueToTimeout = new ArrayList<>();
 
-            synchronized (queue) {
-                queue.add(shipment);
-                queueSize = queue.size();
+            addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(shipment, requestedShipments);
+
+            if (!requestedShipments.isEmpty()) {
+                getShipments(requestedShipments);
+            } else {
+                waitForEnoughEntriesAndRequestDataAfterTimeout(shipment, requestedShipmentsDueToTimeout);
             }
 
-            if (queueSize >= 4) {
-                getShipments();
-            } else {
-                synchronized (queue) {
-                    queue.wait(5000);
-                }
-
-                if(!results.containsKey(shipment)) {
-                    getShipments();
-                }
+            if (!requestedShipmentsDueToTimeout.isEmpty()) {
+                getShipments(requestedShipmentsDueToTimeout);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
-        // TODO concurrency issue here
+        // Here a concurrency issue remains for the case where the same results have been requested multiple times
         if (!queue.contains(shipment)) {
             return CompletableFuture.completedFuture(new ShipmentInfo(shipment, results.remove(shipment)));
         } else {
@@ -58,17 +55,32 @@ public class ShipmentsService {
         }
     }
 
-    private void getShipments() {
-        List<String> requestedShipments = new ArrayList<>();
-
+    private void waitForEnoughEntriesAndRequestDataAfterTimeout(String shipment, List<String> requestedShipmentsDueToTimeout) throws InterruptedException {
         synchronized (queue) {
-            int queueSize = queue.size();
+            queue.wait(queueTimeoutProperties.getTimeoutInMilliseconds());
 
-            for (int i = 0; i < 5 && i < queueSize; i++) {
-                requestedShipments.add(queue.remove(0));
+            if(!results.containsKey(shipment)) {
+                int queueSize = queue.size();
+                for (int i = 0; i < 5 && i < queueSize; i++) {
+                    requestedShipmentsDueToTimeout.add(queue.remove(0));
+                }
             }
         }
+    }
 
+    private void addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(String shipment, List<String> requestedShipments) {
+        synchronized (queue) {
+            queue.add(shipment);
+
+            if (queue.size() == 5) {
+                for (int i = 0; i < 5; i++) {
+                    requestedShipments.add(queue.remove(0));
+                }
+            }
+        }
+    }
+
+    private void getShipments(List<String> requestedShipments) {
         Map<String, List<String>> answer = getShipmentsService.getShipments(requestedShipments);
 
         results.putAll(answer);
