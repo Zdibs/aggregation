@@ -26,8 +26,7 @@ public class GetPricingService {
                 "/" + apiProperties.getPricingEndpoint() + "?q=" + String.join(",", countryCodes));
 
         try {
-            Map<String, String> answer = parseResult(responseBody);
-            return answer;
+            return parseResult(responseBody);
         } catch (IOException e) {
             e.printStackTrace();
         }
