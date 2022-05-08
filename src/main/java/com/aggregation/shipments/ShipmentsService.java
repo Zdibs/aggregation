@@ -1,54 +1,75 @@
 package com.aggregation.shipments;
 
-import com.aggregation.configuration.ApiProperties;
-import com.aggregation.okhttp.OkHttpCallManager;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Scope;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
+@Slf4j
 @Service
+@Scope("singleton")
 @RequiredArgsConstructor
 public class ShipmentsService {
 
-    private final ObjectMapper objectMapper;
-    private final ApiProperties apiProperties;
-    private final OkHttpCallManager okHttpCallManager;
+    private final GetShipmentsService getShipmentsService;
+
+    private final CyclicBarrier cyclicBarrier = new CyclicBarrier(5, new Runnable() {
+        @Override
+        public void run() {
+            List<String> requestedShipments = new ArrayList<>();
+
+            for (int i = 0; i < 5; i++) {
+                requestedShipments.add(requests.remove(0));
+            }
+
+            Map<String, List<String>> answer = getShipmentsService.getShipments(requestedShipments);
+
+            results.putAll(answer);
+        }
+    });
+
+    private final List<String> requests = Collections.synchronizedList(new ArrayList<>());
+    private final Map<String, List<String>> results = Collections.synchronizedMap(new HashMap<>());
 
     @Async
-    public CompletableFuture<Map<String, List<String>>> getShipmentInfo(List<String> shipments) {
-        Map<String, List<String>> answer = null;
+    public CompletableFuture<ShipmentInfo> getShipmentInfo(String shipment) {
 
-        if (!shipments.isEmpty()) {
-            String responseBody = okHttpCallManager.call("http://" + apiProperties.getHostname() + ":" + apiProperties.getPort() +
-                    "/" + apiProperties.getShipmentsEndpoint() + "?q=" + String.join(",", shipments));
+        requests.add(shipment);
 
-            try {
-                answer = parseResult(responseBody);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        try {
+            cyclicBarrier.await(5, TimeUnit.SECONDS);
+
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (BrokenBarrierException e) {
+            return getSingleShipment(shipment);
+        } catch (TimeoutException e) {
+            cyclicBarrier.reset();
+            return getSingleShipment(shipment);
         }
 
-        return CompletableFuture.completedFuture(answer);
-    }
-
-    private Map<String, List<String>> parseResult(String responseBody) throws IOException {
-        Map<String, List<String>> answer;
-        answer = responseBody != null ? objectMapper.readValue(responseBody, new TypeReference<HashMap<String, List<String>>>() {}) : Collections.emptyMap();
-
-        if (answer != null && answer.containsKey("message")) {
-            answer = null;
+        if (!requests.contains(shipment)) {
+            return CompletableFuture.completedFuture(new ShipmentInfo(shipment, results.remove(shipment)));
+        } else {
+            return CompletableFuture.completedFuture(new ShipmentInfo(shipment, results.get(shipment)));
         }
-
-        return answer;
     }
+
+    private CompletableFuture<ShipmentInfo> getSingleShipment(String shipment) {
+        Map<String, List<String>> answer = getShipmentsService.getShipments(Collections.singletonList(shipment));
+        return CompletableFuture.completedFuture(new ShipmentInfo(shipment, answer.get(shipment)));
+    }
+
 }

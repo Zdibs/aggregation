@@ -37,13 +37,13 @@ public class AggregationApiTests {
 	private MockMvc mockMvc;
 
 	@Test
-	public void aggregation() throws Exception {
+	public void aggregation_singleSetOfFiveEntries() throws Exception {
 
 		this.mockMvc.perform(
 					get("/aggregation")
-						.param("pricing", "NL,CN")
-						.param("track", "109347263,1234567891")
-						.param("shipments", "109347263,1234567891")
+						.param("pricing", "NL,CN,DE,BE,FR")
+						.param("track", "109347263,1234567891,223422,554364,26744")
+						.param("shipments", "109347263,1234567891,223422,554364,26744")
 				)
 				.andDo(print()).andExpect(status().isOk())
 				.andExpect(content().string(containsString("pricing")))

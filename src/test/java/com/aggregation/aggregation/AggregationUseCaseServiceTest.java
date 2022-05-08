@@ -2,6 +2,8 @@ package com.aggregation.aggregation;
 
 import com.aggregation.aggregation.api.AggregationResource;
 import com.aggregation.pricing.PricingService;
+import com.aggregation.shipments.ShipmentInfo;
+import com.aggregation.shipments.ShipmentInfoBuilder;
 import com.aggregation.shipments.ShipmentsService;
 import com.aggregation.track.TrackService;
 import org.junit.jupiter.api.Test;
@@ -13,7 +15,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -61,15 +62,23 @@ public class AggregationUseCaseServiceTest {
         String shipments2 = "8975543";
         List<String> shipments = Arrays.asList(shipments1, shipments2);
 
-        Map<String, List<String>> obtainedShipments = new HashMap<>();
-        obtainedShipments.put(shipments1, Arrays.asList("box", "box"));
-        obtainedShipments.put(shipments2, Arrays.asList("envelope", "box"));
-        when(shipmentsService.getShipmentInfo(shipments)).thenReturn(CompletableFuture.completedFuture(obtainedShipments));
+        ShipmentInfo shipmentInfo1 = ShipmentInfoBuilder.builder()
+                .key(shipments1)
+                .value(Arrays.asList("box", "box"))
+                .build();
+        ShipmentInfo shipmentInfo2 = ShipmentInfoBuilder.builder()
+                .key(shipments2)
+                .value(Arrays.asList("envelope", "box"))
+                .build();
+        when(shipmentsService.getShipmentInfo(shipments1)).thenReturn(CompletableFuture.completedFuture(shipmentInfo1));
+        when(shipmentsService.getShipmentInfo(shipments2)).thenReturn(CompletableFuture.completedFuture(shipmentInfo2));
 
         AggregationResource aggregationResource = aggregationUseCaseService.aggregate(countryCodes, trackNumbers, shipments);
 
         assertThat(aggregationResource.getPricing(), is(obtainedPricing));
-        assertThat(aggregationResource.getShipments(), is(obtainedShipments));
+        assertThat(aggregationResource.getShipments().size(), is(2));
+        assertThat(aggregationResource.getShipments().get(shipments1), is(shipmentInfo1.getValue()));
+        assertThat(aggregationResource.getShipments().get(shipments2), is(shipmentInfo2.getValue()));
         assertThat(aggregationResource.getTrack(), is(obtainedTrack));
     }
 
