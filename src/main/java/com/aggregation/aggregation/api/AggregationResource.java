@@ -1,22 +1,20 @@
 package com.aggregation.aggregation.api;
 
-import com.aggregation.pricing.api.PricingResource;
-import com.aggregation.shipments.api.ShipmentsResource;
-import com.aggregation.track.api.TrackResource;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
 @AllArgsConstructor
 public class AggregationResource {
 
-    private List<PricingResource> pricingResources;
+    private Map<String, String> pricing;
 
-    private List<TrackResource> trackResources;
+    private Map<String, String> track;
 
-    private List<ShipmentsResource> shipmentsResources;
+    private Map<String, List<String>> shipments;
 }

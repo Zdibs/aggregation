@@ -2,17 +2,14 @@ package com.aggregation.aggregation;
 
 import com.aggregation.aggregation.api.AggregationResource;
 import com.aggregation.pricing.PricingService;
-import com.aggregation.pricing.api.PricingResource;
 import com.aggregation.shipments.ShipmentsService;
-import com.aggregation.shipments.api.ShipmentsResource;
 import com.aggregation.track.TrackService;
-import com.aggregation.track.api.TrackResource;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -24,21 +21,21 @@ public class AggregationUseCaseService {
 
     public AggregationResource aggregate(@Nullable List<String> countryCodes, @Nullable List<String> trackNumbers, @Nullable List<String> shipments) {
 
-        List<PricingResource> pricingInfo = Collections.emptyList();
+        Map<String, String> pricingInfo = null;
 
         if (countryCodes != null && !countryCodes.isEmpty()) {
             pricingInfo = pricingService.getPricingInfo(countryCodes);
         }
 
-        List<TrackResource> trackInfo = Collections.emptyList();
+        Map<String, String> trackInfo = null;
 
         if (trackNumbers != null && !trackNumbers.isEmpty()) {
             trackInfo = trackService.getTrackingInfo(trackNumbers);
         }
 
-        List<ShipmentsResource> shipmentsInfo = Collections.emptyList();
+        Map<String, List<String>> shipmentsInfo = null;
 
-        if (shipmentsInfo != null && !shipmentsInfo.isEmpty()) {
+        if (shipments != null && !shipments.isEmpty()) {
             shipmentsInfo = shipmentsService.getShipmentInfo(shipments);
         }
 
