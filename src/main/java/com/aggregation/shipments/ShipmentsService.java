@@ -34,7 +34,14 @@ public class ShipmentsService {
         Call call = client.newCall(request);
         try {
             ResponseBody responseBody = call.execute().body();
-            return responseBody != null ? objectMapper.readValue(responseBody.string(), new TypeReference<HashMap<String, List<String>>>(){}) : Collections.emptyMap();
+            Map<String, List<String>> answer;
+            answer = responseBody != null ? objectMapper.readValue(responseBody.string(), new TypeReference<HashMap<String, List<String>>>(){}) : Collections.emptyMap();
+
+            if (answer != null && answer.containsKey("message")) {
+                answer = null;
+            }
+
+            return answer;
         } catch (IOException e) {
             e.printStackTrace();
         }
