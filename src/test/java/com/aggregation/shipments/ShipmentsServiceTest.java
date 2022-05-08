@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -45,7 +46,7 @@ class ShipmentsServiceTest {
     private ShipmentsService shipmentsService;
 
     @Test
-    void getShipmentInfo_success() throws IOException {
+    void getShipmentInfo_success() throws IOException, ExecutionException, InterruptedException {
         // given
         String shipments1 = "2136544";
         String shipments2 = "8975543";
@@ -67,7 +68,7 @@ class ShipmentsServiceTest {
 
         // when
         List<String> shipments = Arrays.asList(shipments1, shipments2);
-        Map<String, List<String>> result = shipmentsService.getShipmentInfo(shipments);
+        Map<String, List<String>> result = shipmentsService.getShipmentInfo(shipments).get();
 
         // then
         String requestUrl = requestUrlCaptor.getValue();
@@ -77,15 +78,15 @@ class ShipmentsServiceTest {
     }
 
     @Test
-    void getShipmentInfo_shouldHandleEmptyShipmentsList() {
-        Map<String, List<String>> result = shipmentsService.getShipmentInfo(Collections.emptyList());
+    void getShipmentInfo_shouldHandleEmptyShipmentsList() throws ExecutionException, InterruptedException {
+        Map<String, List<String>> result = shipmentsService.getShipmentInfo(Collections.emptyList()).get();
 
         assertThat(result, is(nullValue()));
         verifyNoInteractions(okHttpCallManager);
     }
 
     @Test
-    void getShipmentInfo_shouldHandleResultThatContainsMessageKeyword() throws JsonProcessingException {
+    void getShipmentInfo_shouldHandleResultThatContainsMessageKeyword() throws JsonProcessingException, ExecutionException, InterruptedException {
         // given
         String shipments1 = "2136544";
         String shipments2 = "8975543";
@@ -106,7 +107,7 @@ class ShipmentsServiceTest {
 
         // when
         List<String> shipments = Arrays.asList(shipments1, shipments2);
-        Map<String, List<String>> result = shipmentsService.getShipmentInfo(shipments);
+        Map<String, List<String>> result = shipmentsService.getShipmentInfo(shipments).get();
 
         // then
         String requestUrl = requestUrlCaptor.getValue();

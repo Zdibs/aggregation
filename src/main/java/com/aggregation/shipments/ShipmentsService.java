@@ -5,6 +5,7 @@ import com.aggregation.okhttp.OkHttpCallManager;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -12,6 +13,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -21,19 +23,22 @@ public class ShipmentsService {
     private final ApiProperties apiProperties;
     private final OkHttpCallManager okHttpCallManager;
 
-    public Map<String, List<String>> getShipmentInfo(List<String> shipments) {
+    @Async
+    public CompletableFuture<Map<String, List<String>>> getShipmentInfo(List<String> shipments) {
+        Map<String, List<String>> answer = null;
+
         if (!shipments.isEmpty()) {
             String responseBody = okHttpCallManager.call("http://" + apiProperties.getHostname() + ":" + apiProperties.getPort() +
                     "/" + apiProperties.getShipmentsEndpoint() + "?q=" + String.join(",", shipments));
 
             try {
-                return parseResult(responseBody);
+                answer = parseResult(responseBody);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
 
-        return null;
+        return CompletableFuture.completedFuture(answer);
     }
 
     private Map<String, List<String>> parseResult(String responseBody) throws IOException {

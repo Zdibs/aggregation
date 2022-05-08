@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -45,7 +46,7 @@ public class PricingServiceTest {
     private PricingService pricingService;
 
     @Test
-    void getPricingInfo_success() throws IOException {
+    void getPricingInfo_success() throws IOException, ExecutionException, InterruptedException {
         // given
         String pricing1 = "CN";
         String pricing2 = "NL";
@@ -67,7 +68,7 @@ public class PricingServiceTest {
 
         // when
         List<String> pricing = Arrays.asList(pricing1, pricing2);
-        Map<String, String> result = pricingService.getPricingInfo(pricing);
+        Map<String, String> result = pricingService.getPricingInfo(pricing).get();
 
         // then
         String requestUrl = requestUrlCaptor.getValue();
@@ -77,15 +78,15 @@ public class PricingServiceTest {
     }
 
     @Test
-    void getPricingInfo_shouldHandleEmptyShipmentsList() {
-        Map<String, String> result = pricingService.getPricingInfo(Collections.emptyList());
+    void getPricingInfo_shouldHandleEmptyShipmentsList() throws ExecutionException, InterruptedException {
+        Map<String, String> result = pricingService.getPricingInfo(Collections.emptyList()).get();
 
         assertThat(result, is(nullValue()));
         verifyNoInteractions(okHttpCallManager);
     }
 
     @Test
-    void getPricingInfo_shouldHandleResultThatContainsMessageKeyword() throws JsonProcessingException {
+    void getPricingInfo_shouldHandleResultThatContainsMessageKeyword() throws JsonProcessingException, ExecutionException, InterruptedException {
         // given
         String pricing1 = "CN";
         String pricing2 = "NL";
@@ -106,7 +107,7 @@ public class PricingServiceTest {
 
         // when
         List<String> pricing = Arrays.asList(pricing1, pricing2);
-        Map<String, String> result = pricingService.getPricingInfo(pricing);
+        Map<String, String> result = pricingService.getPricingInfo(pricing).get();
 
         // then
         String requestUrl = requestUrlCaptor.getValue();

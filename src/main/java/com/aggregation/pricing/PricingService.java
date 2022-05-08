@@ -5,6 +5,7 @@ import com.aggregation.okhttp.OkHttpCallManager;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -12,6 +13,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -21,19 +23,22 @@ public class PricingService {
     private final ApiProperties apiProperties;
     private final OkHttpCallManager okHttpCallManager;
 
-    public Map<String, String> getPricingInfo(List<String> countryCodes) {
+    @Async
+    public CompletableFuture<Map<String, String>> getPricingInfo(List<String> countryCodes) {
+        Map<String, String> answer = null;
+
         if (!countryCodes.isEmpty()) {
             String responseBody = okHttpCallManager.call("http://" + apiProperties.getHostname() + ":" + apiProperties.getPort() +
                     "/" + apiProperties.getPricingEndpoint() + "?q=" + String.join(",", countryCodes));
 
             try {
-                return parseResult(responseBody);
+                answer = parseResult(responseBody);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
 
-        return null;
+        return CompletableFuture.completedFuture(answer);
     }
 
     private Map<String, String> parseResult(String responseBody) throws IOException {

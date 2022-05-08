@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -44,7 +45,7 @@ public class AggregationUseCaseServiceTest {
         obtainedPricing.put(pricing1, "22.956661391130684");
         obtainedPricing.put(pricing2, "73.98055140423651");
 
-        when(pricingService.getPricingInfo(countryCodes)).thenReturn(obtainedPricing);
+        when(pricingService.getPricingInfo(countryCodes)).thenReturn(CompletableFuture.completedFuture(obtainedPricing));
 
         String track1 = "109347263";
         String track2 = "1234567891";
@@ -54,7 +55,7 @@ public class AggregationUseCaseServiceTest {
         obtainedTrack.put(track1, "DELIVERING");
         obtainedTrack.put(track2, "IN TRANSIT");
 
-        when(trackService.getTrackingInfo(trackNumbers)).thenReturn(obtainedTrack);
+        when(trackService.getTrackingInfo(trackNumbers)).thenReturn(CompletableFuture.completedFuture(obtainedTrack));
 
         String shipments1 = "2136544";
         String shipments2 = "8975543";
@@ -63,7 +64,7 @@ public class AggregationUseCaseServiceTest {
         Map<String, List<String>> obtainedShipments = new HashMap<>();
         obtainedShipments.put(shipments1, Arrays.asList("box", "box"));
         obtainedShipments.put(shipments2, Arrays.asList("envelope", "box"));
-        when(shipmentsService.getShipmentInfo(shipments)).thenReturn(obtainedShipments);
+        when(shipmentsService.getShipmentInfo(shipments)).thenReturn(CompletableFuture.completedFuture(obtainedShipments));
 
         AggregationResource aggregationResource = aggregationUseCaseService.aggregate(countryCodes, trackNumbers, shipments);
 
