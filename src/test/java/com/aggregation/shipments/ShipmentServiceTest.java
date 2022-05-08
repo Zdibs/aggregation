@@ -39,7 +39,7 @@ public class ShipmentServiceTest {
         threadPoolTaskExecutor.setCorePoolSize(5);
         threadPoolTaskExecutor.initialize();
 
-        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(1);
+        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(100);
 
         List<String> shipmentIds = new ArrayList<>();
         shipmentIds.add("1234567891");
@@ -72,7 +72,7 @@ public class ShipmentServiceTest {
         threadPoolTaskExecutor.setCorePoolSize(5);
         threadPoolTaskExecutor.initialize();
 
-        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(20);
+        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(100);
 
         List<String> shipmentIds = new ArrayList<>();
         shipmentIds.add("1234567891");
@@ -86,7 +86,7 @@ public class ShipmentServiceTest {
                 shipmentsService.getShipmentInfo(shipmentIds.get(finalI));
                 countDownLatch.countDown();
             });
-            Thread.sleep(10);
+            Thread.sleep(20);
         }
 
         countDownLatch.await();

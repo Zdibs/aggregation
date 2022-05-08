@@ -29,15 +29,14 @@ public class ShipmentsService {
     @Async
     public CompletableFuture<ShipmentInfo> getShipmentInfo(String shipment) {
         try {
-            List<String> requestedShipments = new ArrayList<>();
             List<String> requestedShipmentsDueToTimeout = new ArrayList<>();
 
-            addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(shipment, requestedShipments);
+            List<String> requestedShipments = addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(shipment);
 
             if (!requestedShipments.isEmpty()) {
                 getShipments(requestedShipments);
             } else {
-                waitForEnoughEntriesAndRequestDataAfterTimeout(shipment, requestedShipmentsDueToTimeout);
+                requestedShipmentsDueToTimeout.addAll(waitForEnoughEntriesAndRequestDataAfterTimeout(shipment));
             }
 
             if (!requestedShipmentsDueToTimeout.isEmpty()) {
@@ -55,7 +54,9 @@ public class ShipmentsService {
         }
     }
 
-    private void waitForEnoughEntriesAndRequestDataAfterTimeout(String shipment, List<String> requestedShipmentsDueToTimeout) throws InterruptedException {
+    private List<String> waitForEnoughEntriesAndRequestDataAfterTimeout(String shipment) throws InterruptedException {
+        List<String> requestedShipmentsDueToTimeout = new ArrayList<>();
+
         synchronized (queue) {
             queue.wait(queueTimeoutProperties.getTimeoutInMilliseconds());
 
@@ -66,9 +67,13 @@ public class ShipmentsService {
                 }
             }
         }
+
+        return requestedShipmentsDueToTimeout;
     }
 
-    private void addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(String shipment, List<String> requestedShipments) {
+    private List<String> addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(String shipment) {
+        List<String> requestedShipments = new ArrayList<>();
+
         synchronized (queue) {
             queue.add(shipment);
 
@@ -78,6 +83,8 @@ public class ShipmentsService {
                 }
             }
         }
+
+        return requestedShipments;
     }
 
     private void getShipments(List<String> requestedShipments) {

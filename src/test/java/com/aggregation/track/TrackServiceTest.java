@@ -34,12 +34,12 @@ public class TrackServiceTest {
     private TrackService trackService;
 
     @Test
-    void getShipmentInfo_calledExactlyFiveTimes() throws InterruptedException {
+    void getTrackingInfo_calledExactlyFiveTimes() throws InterruptedException {
         ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
         threadPoolTaskExecutor.setCorePoolSize(5);
         threadPoolTaskExecutor.initialize();
 
-        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(1);
+        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(100);
 
         List<String> trackingIds = new ArrayList<>();
         trackingIds.add("1234567891");
@@ -67,12 +67,12 @@ public class TrackServiceTest {
     }
 
     @Test
-    void getShipmentInfo_calledTwiceWaitsOnTimeout() throws InterruptedException {
+    void getTrackingInfo_calledTwiceWaitsOnTimeout() throws InterruptedException {
         ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
         threadPoolTaskExecutor.setCorePoolSize(5);
         threadPoolTaskExecutor.initialize();
 
-        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(20);
+        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(100);
 
         List<String> trackingIds = new ArrayList<>();
         trackingIds.add("1234567891");
@@ -86,7 +86,7 @@ public class TrackServiceTest {
                 trackService.getTrackInfo(trackingIds.get(finalI));
                 countDownLatch.countDown();
             });
-            Thread.sleep(10);
+            Thread.sleep(20);
         }
 
         countDownLatch.await();

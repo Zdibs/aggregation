@@ -34,12 +34,12 @@ public class PricingServiceTest {
     private PricingService pricingService;
 
     @Test
-    void getShipmentInfo_calledExactlyFiveTimes() throws InterruptedException {
+    void getPricingInfo_calledExactlyFiveTimes() throws InterruptedException {
         ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
         threadPoolTaskExecutor.setCorePoolSize(5);
         threadPoolTaskExecutor.initialize();
 
-        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(1);
+        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(100);
 
         List<String> countryCodes = new ArrayList<>();
         countryCodes.add("CN");
@@ -67,12 +67,12 @@ public class PricingServiceTest {
     }
 
     @Test
-    void getShipmentInfo_calledTwiceWaitsOnTimeout() throws InterruptedException {
+    void getPricingInfo_calledTwiceWaitsOnTimeout() throws InterruptedException {
         ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
         threadPoolTaskExecutor.setCorePoolSize(5);
         threadPoolTaskExecutor.initialize();
 
-        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(20);
+        when(queueTimeoutProperties.getTimeoutInMilliseconds()).thenReturn(100);
 
         List<String> countryCodes = new ArrayList<>();
         countryCodes.add("CN");
@@ -86,7 +86,7 @@ public class PricingServiceTest {
                 pricingService.getPricingInfo(countryCodes.get(finalI));
                 countDownLatch.countDown();
             });
-            Thread.sleep(10);
+            Thread.sleep(20);
         }
 
         countDownLatch.await();

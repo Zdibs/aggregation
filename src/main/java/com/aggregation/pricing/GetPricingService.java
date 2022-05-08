@@ -5,7 +5,6 @@ import com.aggregation.okhttp.OkHttpCallManager;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -22,13 +21,13 @@ public class GetPricingService {
     private final ApiProperties apiProperties;
     private final ObjectMapper objectMapper;
 
-    @Async
     public Map<String, String> getPricingInfo(List<String> countryCodes) {
         String responseBody = okHttpCallManager.call("http://" + apiProperties.getHostname() + ":" + apiProperties.getPort() +
                 "/" + apiProperties.getPricingEndpoint() + "?q=" + String.join(",", countryCodes));
 
         try {
-            return parseResult(responseBody);
+            Map<String, String> answer = parseResult(responseBody);
+            return answer;
         } catch (IOException e) {
             e.printStackTrace();
         }

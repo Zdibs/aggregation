@@ -29,19 +29,18 @@ public class PricingService {
     @Async
     public CompletableFuture<PricingInfo> getPricingInfo(String pricing) {
         try {
-            List<String> requestedPricings = new ArrayList<>();
             List<String> requestedPricingsDueToTimeout = new ArrayList<>();
 
-            addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(pricing, requestedPricings);
+            List<String> requestedPricings = addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(pricing);
 
             if (!requestedPricings.isEmpty()) {
-                getShipments(requestedPricings);
+                getPricings(requestedPricings);
             } else {
-                waitForEnoughEntriesAndRequestDataAfterTimeout(pricing, requestedPricingsDueToTimeout);
+                requestedPricingsDueToTimeout.addAll(waitForEnoughEntriesAndRequestDataAfterTimeout(pricing));
             }
 
             if (!requestedPricingsDueToTimeout.isEmpty()) {
-                getShipments(requestedPricingsDueToTimeout);
+                getPricings(requestedPricingsDueToTimeout);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -55,32 +54,40 @@ public class PricingService {
         }
     }
 
-    private void waitForEnoughEntriesAndRequestDataAfterTimeout(String shipment, List<String> requestedShipmentsDueToTimeout) throws InterruptedException {
+    private List<String> waitForEnoughEntriesAndRequestDataAfterTimeout(String countryCode) throws InterruptedException {
+        List<String> requestedPricingsDueToTimeout = new ArrayList<>();
+
         synchronized (queue) {
             queue.wait(queueTimeoutProperties.getTimeoutInMilliseconds());
 
-            if(!results.containsKey(shipment)) {
+            if(!results.containsKey(countryCode)) {
                 int queueSize = queue.size();
                 for (int i = 0; i < 5 && i < queueSize; i++) {
-                    requestedShipmentsDueToTimeout.add(queue.remove(0));
+                    requestedPricingsDueToTimeout.add(queue.remove(0));
                 }
             }
         }
+
+        return requestedPricingsDueToTimeout;
     }
 
-    private void addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(String shipment, List<String> requestedShipments) {
+    private List<String> addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(String countryCode) {
+        List<String> requestedPricings = new ArrayList<>();
+
         synchronized (queue) {
-            queue.add(shipment);
+            queue.add(countryCode);
 
             if (queue.size() == 5) {
                 for (int i = 0; i < 5; i++) {
-                    requestedShipments.add(queue.remove(0));
+                    requestedPricings.add(queue.remove(0));
                 }
             }
         }
+
+        return requestedPricings;
     }
 
-    private void getShipments(List<String> requestedCountryCodes) {
+    private void getPricings(List<String> requestedCountryCodes) {
         Map<String, String> answer = getPricingService.getPricingInfo(requestedCountryCodes);
 
         if (answer != null) {

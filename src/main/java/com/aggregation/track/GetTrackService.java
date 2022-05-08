@@ -5,7 +5,6 @@ import com.aggregation.okhttp.OkHttpCallManager;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -22,7 +21,6 @@ public class GetTrackService {
     private final ApiProperties apiProperties;
     private final ObjectMapper objectMapper;
 
-    @Async
     public Map<String, String> getTrackingInfo(List<String> trackNumbers) {
         String responseBody = okHttpCallManager.call("http://" + apiProperties.getHostname() + ":" + apiProperties.getPort() +
                 "/" + apiProperties.getTrackEndpoint() + "?q=" + String.join(",", trackNumbers));

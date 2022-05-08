@@ -29,19 +29,18 @@ public class TrackService {
     @Async
     public CompletableFuture<TrackInfo> getTrackInfo(String trackingId) {
         try {
-            List<String> requestedPricings = new ArrayList<>();
-            List<String> requestedPricingsDueToTimeout = new ArrayList<>();
+            List<String> requestedTrackingDueToTimeout = new ArrayList<>();
 
-            addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(trackingId, requestedPricings);
+            List<String> requestedTracking = addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(trackingId);
 
-            if (!requestedPricings.isEmpty()) {
-                getShipments(requestedPricings);
+            if (!requestedTracking.isEmpty()) {
+                getTrackingInfo(requestedTracking);
             } else {
-                waitForEnoughEntriesAndRequestDataAfterTimeout(trackingId, requestedPricingsDueToTimeout);
+                requestedTrackingDueToTimeout.addAll(waitForEnoughEntriesAndRequestDataAfterTimeout(trackingId));
             }
 
-            if (!requestedPricingsDueToTimeout.isEmpty()) {
-                getShipments(requestedPricingsDueToTimeout);
+            if (!requestedTrackingDueToTimeout.isEmpty()) {
+                getTrackingInfo(requestedTrackingDueToTimeout);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -55,32 +54,40 @@ public class TrackService {
         }
     }
 
-    private void waitForEnoughEntriesAndRequestDataAfterTimeout(String shipment, List<String> requestedShipmentsDueToTimeout) throws InterruptedException {
+    private List<String> waitForEnoughEntriesAndRequestDataAfterTimeout(String trackingId) throws InterruptedException {
+        List<String> requestedTrackingIdsDueToTimeout = new ArrayList<>();
+
         synchronized (queue) {
             queue.wait(queueTimeoutProperties.getTimeoutInMilliseconds());
 
-            if(!results.containsKey(shipment)) {
+            if(!results.containsKey(trackingId)) {
                 int queueSize = queue.size();
                 for (int i = 0; i < 5 && i < queueSize; i++) {
-                    requestedShipmentsDueToTimeout.add(queue.remove(0));
+                    requestedTrackingIdsDueToTimeout.add(queue.remove(0));
                 }
             }
         }
+
+        return requestedTrackingIdsDueToTimeout;
     }
 
-    private void addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(String shipment, List<String> requestedShipments) {
+    private List<String> addToQueueAndCheckIfQueueHasEnoughEntriesToRequestData(String trackingId) {
+        List<String> requestedTrackingIds = new ArrayList<>();
+
         synchronized (queue) {
-            queue.add(shipment);
+            queue.add(trackingId);
 
             if (queue.size() == 5) {
                 for (int i = 0; i < 5; i++) {
-                    requestedShipments.add(queue.remove(0));
+                    requestedTrackingIds.add(queue.remove(0));
                 }
             }
         }
+
+        return requestedTrackingIds;
     }
 
-    private void getShipments(List<String> trackRequests) {
+    private void getTrackingInfo(List<String> trackRequests) {
         Map<String, String> answer = getTrackService.getTrackingInfo(trackRequests);
 
         if (answer != null) {
