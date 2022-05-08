@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.example.restservice;
+package com.aggregation.aggregation.api;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -29,24 +31,23 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-public class GreetingControllerTests {
+public class AggregationApiTests {
 
 	@Autowired
 	private MockMvc mockMvc;
 
 	@Test
-	public void noParamGreetingShouldReturnDefaultMessage() throws Exception {
+	public void aggregation() throws Exception {
 
-		this.mockMvc.perform(get("/greeting")).andDo(print()).andExpect(status().isOk())
-				.andExpect(jsonPath("$.content").value("Hello, World!"));
-	}
-
-	@Test
-	public void paramGreetingShouldReturnTailoredMessage() throws Exception {
-
-		this.mockMvc.perform(get("/greeting").param("name", "Spring Community"))
+		this.mockMvc.perform(
+					get("/aggregation")
+						.param("pricing", "NL,CN")
+						.param("track", "109347263,1234567891")
+						.param("shipments", "109347263,1234567891")
+				)
 				.andDo(print()).andExpect(status().isOk())
-				.andExpect(jsonPath("$.content").value("Hello, Spring Community!"));
+				.andExpect(content().string(containsString("pricing")))
+				.andExpect(content().string(containsString("track")))
+				.andExpect(content().string(containsString("shipments")));
 	}
-
 }
