@@ -11,11 +11,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
@@ -25,51 +21,60 @@ public class ShipmentsService {
 
     private final GetShipmentsService getShipmentsService;
 
-    private final CyclicBarrier cyclicBarrier = new CyclicBarrier(5, new Runnable() {
-        @Override
-        public void run() {
-            List<String> requestedShipments = new ArrayList<>();
-
-            for (int i = 0; i < 5; i++) {
-                requestedShipments.add(requests.remove(0));
-            }
-
-            Map<String, List<String>> answer = getShipmentsService.getShipments(requestedShipments);
-
-            results.putAll(answer);
-        }
-    });
-
-    private final List<String> requests = Collections.synchronizedList(new ArrayList<>());
+    private final List<String> queue = Collections.synchronizedList(new ArrayList<>());
     private final Map<String, List<String>> results = Collections.synchronizedMap(new HashMap<>());
 
     @Async
     public CompletableFuture<ShipmentInfo> getShipmentInfo(String shipment) {
 
-        requests.add(shipment);
-
         try {
-            cyclicBarrier.await(5, TimeUnit.SECONDS);
+            int queueSize;
 
+            synchronized (queue) {
+                queue.add(shipment);
+                queueSize = queue.size();
+            }
+
+            if (queueSize >= 4) {
+                getShipments();
+            } else {
+                synchronized (queue) {
+                    queue.wait(5000);
+                }
+
+                if(!results.containsKey(shipment)) {
+                    getShipments();
+                }
+            }
         } catch (InterruptedException e) {
             e.printStackTrace();
-        } catch (BrokenBarrierException e) {
-            return getSingleShipment(shipment);
-        } catch (TimeoutException e) {
-            cyclicBarrier.reset();
-            return getSingleShipment(shipment);
         }
 
-        if (!requests.contains(shipment)) {
+        // TODO concurrency issue here
+        if (!queue.contains(shipment)) {
             return CompletableFuture.completedFuture(new ShipmentInfo(shipment, results.remove(shipment)));
         } else {
             return CompletableFuture.completedFuture(new ShipmentInfo(shipment, results.get(shipment)));
         }
     }
 
-    private CompletableFuture<ShipmentInfo> getSingleShipment(String shipment) {
-        Map<String, List<String>> answer = getShipmentsService.getShipments(Collections.singletonList(shipment));
-        return CompletableFuture.completedFuture(new ShipmentInfo(shipment, answer.get(shipment)));
-    }
+    private void getShipments() {
+        List<String> requestedShipments = new ArrayList<>();
 
+        synchronized (queue) {
+            int queueSize = queue.size();
+
+            for (int i = 0; i < 5 && i < queueSize; i++) {
+                requestedShipments.add(queue.remove(0));
+            }
+        }
+
+        Map<String, List<String>> answer = getShipmentsService.getShipments(requestedShipments);
+
+        results.putAll(answer);
+
+        synchronized (queue) {
+            queue.notifyAll();
+        }
+    }
 }
